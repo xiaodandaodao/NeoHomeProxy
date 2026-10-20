@@ -573,25 +573,33 @@ export function coreFetchReleaseList(repo, channel) {
  * 仓库里同时存在 homeproxy 包与 sing-box 核心的 release，
  * 只能逐个 release 扫描，不能只看最新的那一个。
  */
+export function coreArchMatches(filename, goarch) {
+	return !!match(filename, regexp('(^|[-_.])' + goarch + '($|[-_.])'));
+};
+
+export function corePickAsset(assets, goarch) {
+	let candidates = [];
+
+	for (let asset in (assets || [])) {
+		const n = asset?.name || '';
+		if (!match(n, /linux/i)) continue;
+		if (match(n, /openwrt|alpine|\.apk$|\.deb$|\.rpm$/i)) continue;
+		if (!match(n, /\.(tar\.gz|tgz)$/i)) continue;
+		if (!coreArchMatches(n, goarch)) continue;
+		push(candidates, asset);
+	}
+
+	let chosen = null;
+	for (let a in candidates)
+		if (match(a?.name, /musl/i)) { chosen = a; break; }
+	if (!chosen) chosen = candidates[0];
+
+	return chosen;
+};
+
 export function coreFindAsset(repo, channel, goarch) {
 	for (let rel in coreFetchReleaseList(repo, channel)) {
-		const assets = rel?.assets || [];
-		let candidates = [];
-
-		for (let asset in assets) {
-			const n = asset?.name || '';
-			if (!match(n, /linux/i)) continue;
-			if (match(n, /openwrt|alpine|\.apk$|\.deb$|\.rpm$/i)) continue;
-			if (!match(n, /\.(tar\.gz|tgz)$/i)) continue;
-			if (!coreArchMatches(n, goarch)) continue;
-			push(candidates, asset);
-		}
-
-		let chosen = null;
-		for (let a in candidates)
-			if (match(a?.name, /musl/i)) { chosen = a; break; }
-		if (!chosen) chosen = candidates[0];
-
+		const chosen = corePickAsset(rel?.assets, goarch);
 		if (chosen)
 			return { release: rel, asset: chosen };
 	}
@@ -599,6 +607,3 @@ export function coreFindAsset(repo, channel, goarch) {
 	return null;
 };
 
-export function coreArchMatches(filename, goarch) {
-	return !!match(filename, regexp('(^|[-_.])' + goarch + '($|[-_.])'));
-};

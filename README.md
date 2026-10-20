@@ -71,6 +71,10 @@ uci commit homeproxy
 
 没改之前，界面上的「更新核心」对 NeoHomeProxy 用户是不工作的。
 
+> **关于限流**：更新源走的是 GitHub REST API，未认证请求每个出口 IP 每小时只有 60 次。
+> 家庭宽带 / 软路由多人共用出口时很容易触发 403（`API rate limit exceeded`），
+> 此时在「服务状态」页填一个 **GitHub token** 即可（上限提升到 5000 次/小时）。
+
 ## 相对上游的改动
 
 | 文件 | 改动 | 原因 |
