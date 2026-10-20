@@ -19,6 +19,10 @@ jobs:
     steps:
       - name: Checkout source tree
         uses: actions/checkout@v6
+        with:
+          # 完整历史:版本号里的 r<N> 取自 git rev-list --count,
+          # 浅克隆会恒为 1,同一天重复出包会撞版本
+          fetch-depth: 0
 
       - name: Checkout apk
         uses: actions/checkout@v6
