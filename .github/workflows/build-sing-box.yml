@@ -261,25 +261,30 @@ jobs:
             exit 0
           fi
 
-          stage="$(mktemp -d)"
-          if [[ "$PKG_FORMAT" == "apk" ]]; then
-            "$SDK_ROOT/staging_dir/host/bin/apk" --allow-untrusted extract --destination "$stage" "$pkg" >/dev/null 2>&1 || \
-              "$SDK_ROOT/staging_dir/host/bin/apk" extract --destination "$stage" "$pkg" >/dev/null 2>&1 || true
-          else
-            ( cd "$stage" && tar -xzf "$pkg" && tar -xzf data.tar.gz ) || true
+          # 首选直接从 SDK 的 staging 目录取二进制（最可靠）
+          bin="$(find "$SDK_ROOT/staging_dir" -type f -path '*/usr/bin/sing-box' 2>/dev/null | head -n1 || true)"
+
+          # 兜底：从打好的包里把二进制抽出来
+          if [[ -z "$bin" ]]; then
+            stage="$(mktemp -d)"
+            if [[ "$PKG_FORMAT" == "apk" ]]; then
+              "$SDK_ROOT/staging_dir/host/bin/apk" --allow-untrusted extract --destination "$stage" "$pkg" >/dev/null 2>&1 || \
+                "$SDK_ROOT/staging_dir/host/bin/apk" extract --destination "$stage" "$pkg" >/dev/null 2>&1 || true
+            else
+              ( cd "$stage" && tar -xzf "$pkg" && tar -xzf data.tar.gz ) || true
+            fi
+            bin="$(find "$stage" -type f -path '*/usr/bin/sing-box' 2>/dev/null | head -n1 || true)"
+            rm -rf "$stage"
           fi
 
-          bin="$(find "$stage" -type f -path '*/usr/bin/sing-box' 2>/dev/null | head -n1 || true)"
           if [[ -z "$bin" ]]; then
-            echo "::warning::sing-box binary not found inside $pkg, skipping core tarball"
-            rm -rf "$stage"
+            echo "::warning::sing-box binary not found, skipping core tarball"
             exit 0
           fi
 
           out="$RUNNER_TEMP/output/sing-box-linux-${GO_ARCH}-musl.tar.gz"
           tar -czf "$out" -C "$(dirname "$bin")" "$(basename "$bin")"
-          rm -rf "$stage"
-          echo "core tarball: $out ($(du -h "$out" | cut -f1))"
+          echo "core tarball: $out ($(du -h "$out" | cut -f1)) from $bin"
 
       - name: Upload package
         uses: actions/upload-artifact@v4
