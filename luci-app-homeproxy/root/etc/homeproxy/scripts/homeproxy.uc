@@ -233,6 +233,16 @@ export function reconcileUrltestNodes(uci, config, logger) {
 		log('Main UDP node is gone; falling back to using the main node for UDP.');
 	}
 
+	/* Named node groups: shared urltest groups referenced by proxy rules */
+	const groupMembers = {};
+	uci.foreach(config, 'group', (cfg) => {
+		if (cfg.enabled !== '1' || isEmpty(cfg.label))
+			return;
+
+		const members = reconcileList(cfg['.name'], 'nodes');
+		groupMembers[cfg.label] = length(members) > 0;
+	});
+
 	uci.foreach(config, 'app_rule', (cfg) => {
 		const label = trim(cfg.custom_service_name || '') || cfg.source || cfg['.name'];
 		const node = cfg.node || 'main-out';
@@ -243,6 +253,13 @@ export function reconcileUrltestNodes(uci, config, logger) {
 				uci.set(config, cfg['.name'], 'node', 'main-out');
 				changed = true;
 				log(sprintf('Proxy Rule "%s" URLTest group is empty; falling back to the main node.', label));
+			}
+		} else if (length(node) > 6 && substr(node, 0, 6) === 'group:') {
+			const group_label = substr(node, 6);
+			if (!groupMembers[group_label]) {
+				uci.set(config, cfg['.name'], 'node', 'main-out');
+				changed = true;
+				log(sprintf('Proxy Rule "%s" node group "%s" is empty or gone; falling back to the main node.', label, group_label));
 			}
 		} else if (node !== 'main-out' && node !== 'direct-out' && node !== 'reject-out' && uci.get(config, node) !== 'node') {
 			uci.set(config, cfg['.name'], 'node', 'main-out');

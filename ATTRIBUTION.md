@@ -79,6 +79,28 @@ exit 2 → `curlGET()` 返回 null → 所有订阅导入失败（与格式、UA
 
 - `PKG_URL` / `PKG_MAINTAINER` / `PKG_DESC` 指向本仓库（保留上游致谢信息）。
 
+### 8. `luci-app-homeproxy/root/etc/homeproxy/scripts/homeproxy.uc`  ← **最关键的一处**
+
+**功能：节点组在「订阅更新」时不被误判为失效**
+
+- `reconcileUrltestNodes()` 中新增 `group` 段的成员清理与登记（`groupMembers`）。
+- 应用分流规则的出口判定新增 `group:` 分支：组存在且非空 → 保留；组不存在或被清空 →
+  回退 `main-out` 并写日志。
+
+**为什么**（这是实测踩到的坑）：本项目里有**两份** reconcile 实现——
+
+| 文件 | 运行环境 | 是否被调用 |
+| --- | --- | --- |
+| `htdocs/luci-static/resources/homeproxy.js` | 浏览器 / LuCI 界面 | 本 fork 中**无调用点**（只有定义） |
+| `root/etc/homeproxy/scripts/homeproxy.uc` | 路由器 / ucode | **订阅更新时会被调用**（`update_subscriptions.uc` 末尾） |
+
+原逻辑里「出口值不在节点表里 → 打回 `main-out`」这一条会把 `group:<组名>` 误判为失效。
+只补 JS 版的话，**界面里看着一切正常，一跑订阅更新规则就悄悄回落到主节点**——
+必须补 ucode 版。
+
+> 教训：改动前先确认「这段逻辑到底在哪个文件、哪条链路上执行」。
+> 浏览器端和设备端各有一份同名函数时，两边都要看。
+
 ## 同步上游的流程
 
 1. `git fetch upstream && git log upstream/main --oneline -1` 看上游进展。
