@@ -473,6 +473,9 @@ export function jobRead(name) {
 
 export const CORE_REPO_OFFICIAL = 'shtorm-7/sing-box-extended';
 
+/* NeoHomeProxy 自建更新源：核心 tarball 由本仓库的 CI 发布 */
+export const CORE_REPO_NEO = 'xiaodandaodao/NeoHomeProxy';
+
 export function coreDetectArch() {
 	const os_rel = readfile('/etc/os-release') || '';
 	const m = match(os_rel, /OPENWRT_ARCH="?([^"\n]+)"?/);
@@ -543,6 +546,55 @@ export function coreFetchRelease(repo, channel) {
 		for (let rel in list)
 			if (rel?.tag_name && !rel.prerelease && !rel.draft)
 				return rel;
+
+	return null;
+};
+
+export function coreRepo() {
+	const fd = popen('uci -q get homeproxy.config.core_repo 2>/dev/null');
+	let repo = null;
+	if (fd) { repo = trim(fd.read('all')); fd.close(); }
+	return (repo && length(repo)) ? repo : CORE_REPO_NEO;
+};
+
+export function coreFetchReleaseList(repo, channel) {
+	const list = coreFetchJson(`https://api.github.com/repos/${repo}/releases?per_page=30`);
+	if (type(list) !== 'array' || !length(list))
+		return [];
+
+	if (channel === 'latest')
+		return [list[0]];
+
+	return filter(list, (rel) => rel?.tag_name && !rel.prerelease && !rel.draft);
+};
+
+/*
+ * 在若干个 release 中找出带「linux + 架构 + tar.gz」资产的第一个。
+ * 仓库里同时存在 homeproxy 包与 sing-box 核心的 release，
+ * 只能逐个 release 扫描，不能只看最新的那一个。
+ */
+export function coreFindAsset(repo, channel, goarch) {
+	for (let rel in coreFetchReleaseList(repo, channel)) {
+		const assets = rel?.assets || [];
+		let candidates = [];
+
+		for (let asset in assets) {
+			const n = asset?.name || '';
+			if (!match(n, /linux/i)) continue;
+			if (match(n, /openwrt|alpine|\.apk$|\.deb$|\.rpm$/i)) continue;
+			if (!match(n, /\.(tar\.gz|tgz)$/i)) continue;
+			if (!coreArchMatches(n, goarch)) continue;
+			push(candidates, asset);
+		}
+
+		let chosen = null;
+		for (let a in candidates)
+			if (match(a?.name, /musl/i)) { chosen = a; break; }
+		if (!chosen) chosen = candidates[0];
+
+		if (chosen)
+			return { release: rel, asset: chosen };
+	}
 
 	return null;
 };

@@ -45,6 +45,7 @@ jobs:
           - platform_name: ARM64
             pkg_format: apk
             arch_suffix: arm64
+            go_arch: arm64
             sdk_base: snapshots
             sdk_path: qualcommax/ipq60xx
             sdk_prefix: immortalwrt-sdk-qualcommax-ipq60xx_
@@ -54,6 +55,7 @@ jobs:
           - platform_name: AMD64
             pkg_format: apk
             arch_suffix: x86_64
+            go_arch: amd64
             sdk_base: snapshots
             sdk_path: x86/64
             sdk_prefix: immortalwrt-sdk-x86-64_
@@ -63,6 +65,7 @@ jobs:
           - platform_name: ARM64
             pkg_format: ipk
             arch_suffix: arm64
+            go_arch: arm64
             sdk_base: releases/24.10.6
             sdk_path: qualcommax/ipq807x
             sdk_prefix: immortalwrt-sdk-24.10.6-qualcommax-ipq807x_gcc-13.3.0_
@@ -72,6 +75,7 @@ jobs:
           - platform_name: AMD64
             pkg_format: ipk
             arch_suffix: x86_64
+            go_arch: amd64
             sdk_base: releases/24.10.6
             sdk_path: x86/64
             sdk_prefix: immortalwrt-sdk-24.10.6-x86-64_gcc-13.3.0_
@@ -241,6 +245,41 @@ jobs:
 
           cd "$RUNNER_TEMP/output"
           sha256sum -- * > SHA256SUMS
+
+      - name: Prepare core tarball for the in-app updater
+        env:
+          ARCH_SUFFIX: ${{ matrix.arch_suffix }}
+          GO_ARCH: ${{ matrix.go_arch }}
+          PKG_FORMAT: ${{ matrix.pkg_format }}
+        run: |
+          set -uo pipefail
+          # 界面里的「更新核心」只认 <linux|arch>.tar.gz，不认 OpenWrt 的 apk/ipk，
+          # 所以额外从包里抽出二进制打成 tarball 一并发布。
+          pkg="$(ls "$RUNNER_TEMP"/output/sing-box_"${ARCH_SUFFIX}"-*.* 2>/dev/null | head -n1 || true)"
+          if [[ -z "$pkg" ]]; then
+            echo "::warning::no sing-box package found, skipping core tarball"
+            exit 0
+          fi
+
+          stage="$(mktemp -d)"
+          if [[ "$PKG_FORMAT" == "apk" ]]; then
+            "$SDK_ROOT/staging_dir/host/bin/apk" --allow-untrusted extract --destination "$stage" "$pkg" >/dev/null 2>&1 || \
+              "$SDK_ROOT/staging_dir/host/bin/apk" extract --destination "$stage" "$pkg" >/dev/null 2>&1 || true
+          else
+            ( cd "$stage" && tar -xzf "$pkg" && tar -xzf data.tar.gz ) || true
+          fi
+
+          bin="$(find "$stage" -type f -path '*/usr/bin/sing-box' 2>/dev/null | head -n1 || true)"
+          if [[ -z "$bin" ]]; then
+            echo "::warning::sing-box binary not found inside $pkg, skipping core tarball"
+            rm -rf "$stage"
+            exit 0
+          fi
+
+          out="$RUNNER_TEMP/output/sing-box-linux-${GO_ARCH}-musl.tar.gz"
+          tar -czf "$out" -C "$(dirname "$bin")" "$(basename "$bin")"
+          rm -rf "$stage"
+          echo "core tarball: $out ($(du -h "$out" | cut -f1))"
 
       - name: Upload package
         uses: actions/upload-artifact@v4

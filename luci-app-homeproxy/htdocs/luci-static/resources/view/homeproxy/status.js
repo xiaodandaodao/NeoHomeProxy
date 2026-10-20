@@ -422,9 +422,16 @@ return view.extend({
 		o = s.option(form.DummyValue, '_core_check', _('Version check'));
 		bindCoreRow(o, 'checkRow');
 
+		o = s.option(form.DummyValue, '_core_source', _('Update source'));
+		o.cfgvalue = () => uci.get('homeproxy', 'config', 'core_repo') || 'xiaodandaodao/NeoHomeProxy';
+
 		o = s.option(form.DummyValue, '_dashboard', _('Dashboard'));
 		o.cfgvalue = L.bind(getDashboardUpdate, this, o);
 		o.rawhtml = true;
+
+		o = s.option(form.Value, 'core_repo', _('Update source'),
+			_('Repository used to fetch sing-box core updates, in <code>owner/repo</code> format. Leave empty to use the NeoHomeProxy repository.'));
+		o.placeholder = 'xiaodandaodao/NeoHomeProxy';
 
 		o = s.option(form.Value, 'github_token', _('GitHub token'));
 		o.password = true;

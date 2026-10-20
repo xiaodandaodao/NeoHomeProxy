@@ -101,6 +101,28 @@ exit 2 → `curlGET()` 返回 null → 所有订阅导入失败（与格式、UA
 > 教训：改动前先确认「这段逻辑到底在哪个文件、哪条链路上执行」。
 > 浏览器端和设备端各有一份同名函数时，两边都要看。
 
+### 9. 更新源改为本仓库
+
+**功能：界面「更新核心」从 NeoHomeProxy 拉取 sing-box 核心**
+
+- `root/etc/homeproxy/scripts/homeproxy.uc`：
+  - 新增常量 `CORE_REPO_NEO = 'xiaodandaodao/NeoHomeProxy'`；
+  - 新增 `coreRepo()`：读 UCI `config.core_repo`，为空则用默认仓库；
+  - 新增 `coreFetchReleaseList()` / `coreFindAsset()`：**逐个 release 扫描**，
+    找带「linux + 架构 + tar.gz」资产的第一个（优先 musl）。
+- `root/etc/homeproxy/scripts/update_core.uc`：改用 `coreRepo()` + `coreFindAsset()`；
+  版本号解析兼容本仓库的 `sing-box-v<version>` 标签。
+- `htdocs/luci-static/resources/view/homeproxy/status.js`：
+  新增「更新源」展示行与可编辑项（`config.core_repo`）。
+- `.github/workflows/build-sing-box.yml`：打完核心包后把二进制抽出来，
+  额外发布 `sing-box-linux-<goarch>-musl.tar.gz`（矩阵新增 `go_arch` 字段）。
+
+**为什么**：原实现写死 `shtorm-7/sing-box-extended`，且只在**最新一个** release 里找资产。
+本仓库的 release 是混装的（homeproxy 包 + sing-box 核心），两处都要改才能对上。
+
+**注意**：资产名必须用 **Go 架构**（x86_64 → `amd64`），因为更新器按 Go 架构匹配，
+不是按 OpenWrt 架构。
+
 ## 同步上游的流程
 
 1. `git fetch upstream && git log upstream/main --oneline -1` 看上游进展。

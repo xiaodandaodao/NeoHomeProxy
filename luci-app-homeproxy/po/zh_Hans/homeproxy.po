@@ -3048,3 +3048,15 @@ msgstr "可复用的节点组。分流规则可直接选择它，同一批节点
 msgid "Node group: %s"
 
 msgstr "节点组：%s"
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js:425
+
+msgid "Update source"
+
+msgstr "更新源"
+
+#: htdocs/luci-static/resources/view/homeproxy/status.js:433
+
+msgid "Repository used to fetch sing-box core updates, in <code>owner/repo</code> format. Leave empty to use the NeoHomeProxy repository."
+
+msgstr "获取 sing-box 核心更新所用的仓库，格式为 <code>owner/repo</code>。留空则使用 NeoHomeProxy 仓库。"

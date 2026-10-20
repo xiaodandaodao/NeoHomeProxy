@@ -52,6 +52,25 @@ uci commit homeproxy
 - 组内成员失效（如订阅更新后节点 id 变化）会被自动剔除；组被清空时，引用它的规则回退到主节点。
 - **改名必须同步改引用它的规则**，否则该规则会回退到主节点。
 
+## 更新源（sing-box 核心）
+
+界面里的「更新核心」默认从 **本仓库** 拉取，而不是上游的 `shtorm-7/sing-box-extended`：
+
+| 项 | 值 |
+| --- | --- |
+| 默认更新源 | `xiaodandaodao/NeoHomeProxy` |
+| 核心资产命名 | `sing-box-linux-<goarch>-musl.tar.gz` |
+| 可覆盖 | 服务 → NeoHomeProxy → 服务状态 → 「更新源」（`owner/repo` 格式，留空即用默认） |
+
+上游的更新器只认「`linux` + 架构 + `.tar.gz`」的资产，而本仓库的 CI 原本只发 OpenWrt 的
+`apk`/`ipk` 包，所以额外做了两件事：
+
+1. CI 在打完核心包后，把二进制抽出来打成 `sing-box-linux-<goarch>-musl.tar.gz` 一并发布；
+2. 更新器改为**逐个 release 扫描**（本仓库同时存在 homeproxy 包与核心两种 release，
+   只看最新一个会找不到核心资产）。
+
+没改之前，界面上的「更新核心」对 NeoHomeProxy 用户是不工作的。
+
 ## 相对上游的改动
 
 | 文件 | 改动 | 原因 |

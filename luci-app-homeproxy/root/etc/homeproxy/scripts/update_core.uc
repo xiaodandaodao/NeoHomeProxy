@@ -6,13 +6,13 @@ import { access, popen, readfile } from 'fs';
 
 import {
 	shellQuote, HP_DIR, RUN_DIR, jobWrite, coreDetectArch,
-	coreGoarch, coreFetchRelease, coreArchMatches, CORE_REPO_OFFICIAL
+	coreGoarch, coreFindAsset, coreRepo
 } from 'homeproxy';
 
 const JOB_NAME = 'core_official';
 
 const SINGBOX_BIN     = '/usr/bin/sing-box';
-const CORE_REPO       = CORE_REPO_OFFICIAL;
+const CORE_REPO       = coreRepo();
 
 function job_write(state, stage, message, version) {
 	jobWrite(JOB_NAME, state, stage, message, version);
@@ -52,28 +52,15 @@ const goarch = coreGoarch(arch);
 if (!goarch)
 	fail('preparing', `no Go-arch mapping for OpenWrt arch "${arch}"`);
 
-const release = coreFetchRelease(CORE_REPO, channel);
-if (!release?.assets)
-	fail('preparing', 'could not read release info from GitHub');
+const found = coreFindAsset(CORE_REPO, channel, goarch);
+if (!found?.asset)
+	fail('preparing', sprintf('no linux/%s tarball found in %s', goarch, CORE_REPO));
 
-const version = replace(release.tag_name, /^v/, '');
+const release = found.release;
+const chosen = found.asset;
 
-let candidates = [];
-for (let asset in release.assets) {
-	const n = asset?.name || '';
-	if (!match(n, /linux/i)) continue;
-	if (match(n, /openwrt|alpine|\.apk$|\.deb$|\.rpm$/i)) continue;
-	if (!match(n, /\.(tar\.gz|tgz)$/i)) continue;
-	if (!coreArchMatches(n, goarch)) continue;
-	push(candidates, asset);
-}
-let chosen = null;
-for (let a in candidates)
-	if (match(a?.name, /musl/i)) { chosen = a; break; }
-if (!chosen) chosen = candidates[0];
-
-if (!chosen)
-	fail('preparing', `no linux/${goarch} tarball found in the latest official release`);
+let version = replace(release.tag_name, /^sing-box-/, '');
+version = replace(version, /^v/, '');
 
 job_write('running', 'downloading', null, version);
 
