@@ -6,7 +6,7 @@ import { access, lstat, popen, readfile, writefile } from 'fs';
 import { cursor } from 'uci';
 import {
 	isBinary, shellQuote, HP_DIR, RUN_DIR,
-	jobWrite, jobRead, coreDetectArch, coreFetchRelease, CORE_REPO_OFFICIAL
+	jobWrite, jobRead, coreDetectArch, coreGoarch, coreFindAsset, coreRepo
 } from '/etc/homeproxy/scripts/homeproxy.uc';
 
 function hasKernelModule(kmod) {
@@ -15,11 +15,12 @@ function hasKernelModule(kmod) {
 
 const SINGBOX_BIN = '/usr/bin/sing-box';
 
-/* Only one core is currently supported; kept as a function (rather than
- * inlining CORE_REPO_OFFICIAL at the call site) so a future second core
- * only needs a new branch here, not a new call-site shape. */
+/* Only one core is currently supported; kept as a function so a future second
+ * core only needs a new branch here, not a new call-site shape.
+ * The repository is configurable (config.core_repo); empty means the
+ * NeoHomeProxy repository. */
 function core_repo(core) {
-	return CORE_REPO_OFFICIAL;
+	return coreRepo();
 }
 
 const methods = {
@@ -378,15 +379,20 @@ const methods = {
 			if (core !== 'official')
 				return { error: 'illegal core' };
 
-			const data = coreFetchRelease(core_repo(core), channel);
-			if (!data)
-				return { error: 'failed to contact GitHub API' };
-			if (!data?.tag_name)
-				return { error: (channel === 'stable')
-					? 'no stable (non-prerelease) release found for this core — try the Latest channel instead'
-					: 'could not read tag_name (rate-limited? set a GitHub token in Resources management)' };
+			const goarch = coreGoarch(coreDetectArch());
+			if (!goarch)
+				return { error: 'could not detect the Go architecture of this device' };
 
-			return { tag: data.tag_name, version: replace(data.tag_name, /^v/, ''), prerelease: !!data.prerelease };
+			/* 仓库里同时存在 homeproxy 包与 sing-box 核心两类 release，
+			 * 只有带核心 tarball 的那个才是本机可用的版本 */
+			const found = coreFindAsset(core_repo(core), channel, goarch);
+			if (!found?.release)
+				return { error: (channel === 'stable')
+					? 'no stable (non-prerelease) core release found for this core — try the Latest channel instead'
+					: 'could not find a matching core release (rate-limited? set a GitHub token in Resources management)' };
+
+			const tag = found.release.tag_name;
+			return { tag: tag, version: replace(replace(tag, /^sing-box-/, ''), /^v/, ''), prerelease: !!found.release.prerelease };
 		}
 	},
 

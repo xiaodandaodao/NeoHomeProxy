@@ -123,6 +123,17 @@ exit 2 → `curlGET()` 返回 null → 所有订阅导入失败（与格式、UA
 **注意**：资产名必须用 **Go 架构**（x86_64 → `amd64`），因为更新器按 Go 架构匹配，
 不是按 OpenWrt 架构。
 
+### 10. `luci-app-homeproxy/root/usr/share/rpcd/ucode/luci.homeproxy`
+
+**功能：界面「版本检查」也跟着指向本仓库**
+
+- `core_repo()` 由返回 `CORE_REPO_OFFICIAL` 改为返回 `coreRepo()`（可配置，默认本仓库）。
+- `core_update_check` 处理函数改用 `coreFindAsset(repo, channel, goarch)` 定位
+  「真正带核心 tarball 的那个 release」，而不是只看最新一个 release。
+
+**为什么**：本仓库的 release 是混装的，只看最新一个会把 homeproxy 包的版本
+（如 `2026.10.20-r501`）当成核心版本报出来。
+
 ## 同步上游的流程
 
 1. `git fetch upstream && git log upstream/main --oneline -1` 看上游进展。
