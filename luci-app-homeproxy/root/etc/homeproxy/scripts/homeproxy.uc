@@ -562,10 +562,13 @@ export function coreFetchReleaseList(repo, channel) {
 	if (type(list) !== 'array' || !length(list))
 		return [];
 
-	if (channel === 'latest')
-		return [list[0]];
+	/* stable 只看正式版；latest 连预发布一起看。
+	 * 两种都返回整个列表（由新到旧），
+	 * 因为本仓库的 release 是混装的，只取最新一个会落到 homeproxy 包上。 */
+	if (channel === 'stable')
+		return filter(list, (rel) => rel?.tag_name && !rel.prerelease && !rel.draft);
 
-	return filter(list, (rel) => rel?.tag_name && !rel.prerelease && !rel.draft);
+	return list;
 };
 
 /*
