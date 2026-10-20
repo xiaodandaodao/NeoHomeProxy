@@ -67,7 +67,7 @@ export function curlGET(url, ua, proxyUrl) {
 	const proxyArg = proxyUrl ? `--proxy ${shellQuote(proxyUrl)} ` : '';
 
 	const outfd = popen(
-		`/usr/bin/curl -fsSL --compressed --retry 3 --retry-all-errors --retry-delay 1 ` +
+		`/usr/bin/curl -fsSL --retry 3 --retry-all-errors --retry-delay 1 ` +
 		`--connect-timeout 10 --max-time 60 ` +
 		`--max-filesize ${maxSize} ${proxyArg}-A ${shellQuote(ua)} ${shellQuote(url)} ` +
 		`2>/dev/null`

@@ -6,9 +6,9 @@ set -o pipefail
 PKG_MGR="${1:-apk}"
 RELEASE_TYPE="${2:-snapshot}"
 
-PKG_URL="https://github.com/XiaoHaiSly/luci-app-homeproxy"
-PKG_MAINTAINER="XiaoHaiSly"
-PKG_DESC="The modern ImmortalWrt proxy platform for ARM64/AMD64"
+PKG_URL="https://github.com/xiaodandaodao/NeoHomeProxy"
+PKG_MAINTAINER="NeoHomeProxy (fork of XiaoHaiSly/luci-app-homeproxy)"
+PKG_DESC="NeoHomeProxy - HomeProxy with reusable node groups"
 
 export PKG_SOURCE_DATE_EPOCH="$(date "+%s")"
 export SOURCE_DATE_EPOCH="$PKG_SOURCE_DATE_EPOCH"

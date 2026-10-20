@@ -3015,3 +3015,30 @@ msgstr ""
 msgid "valid uuid"
 msgstr ""
 
+#: htdocs/luci-static/resources/view/homeproxy/client.js:719
+
+msgid "Node Groups"
+
+msgstr ""
+
+#: htdocs/luci-static/resources/view/homeproxy/client.js:734
+
+msgid "Group name"
+
+msgstr ""
+
+#: htdocs/luci-static/resources/view/homeproxy/client.js:740
+
+msgid "Nodes belonging to this group."
+
+msgstr ""
+
+#: htdocs/luci-static/resources/view/homeproxy/client.js:735
+
+msgid "Reusable node group. Routing rules can select it directly, so the same nodes are maintained in one place only."
+
+msgstr ""
+
+msgid "Node group: %s"
+
+msgstr ""

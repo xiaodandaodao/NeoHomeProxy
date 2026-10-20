@@ -25,6 +25,7 @@ const uciinfra = 'infra',
 
 const ucinode = 'node';
 const uciapprule = 'app_rule';
+const ucigroup = 'group';
 
 const app_rule_urls = {
 	youtube: {
@@ -976,6 +977,34 @@ if (!isEmpty(main_node)) {
 			}
 		};
 
+		/* Named node groups: one shared urltest outbound referenced by multiple app rules */
+		const group_outbounds = {};
+		uci.foreach(uciconfig, ucigroup, (cfg) => {
+			if (cfg.enabled !== '1' || isEmpty(cfg.label))
+				return;
+
+			const group_nodes = valid_node_list(cfg.nodes || []);
+			if (!length(group_nodes))
+				return;
+
+			const group_tag = 'group-' + cfg.label + '-out';
+			group_outbounds[cfg.label] = group_tag;
+
+			if (!has_tag(group_tag)) {
+				push(config.outbounds, {
+					type: 'urltest',
+					tag: group_tag,
+					outbounds: map(group_nodes, (k) => node_out_tag(k)),
+					interval: strToTime(cfg.urltest_interval || '120'),
+					tolerance: strToInt(cfg.urltest_tolerance || '40'),
+					idle_timeout: (strToInt(cfg.urltest_interval || '120') > 1800) ? `${(cfg.urltest_interval || '120') * 2}s` : null,
+					interrupt_exist_connections: (cfg.urltest_interrupt_exist_connections === '1') ? true : null
+				});
+				for (let k in group_nodes)
+					add_node_outbound(k, node_out_tag(k));
+			}
+		});
+
 		uci.foreach(uciconfig, uciapprule, (cfg) => {
 			if (cfg.enabled !== '1' || isEmpty(cfg.source))
 				return;
@@ -994,6 +1023,8 @@ if (!isEmpty(main_node)) {
 				effective_outbound = 'direct-out';
 			} else if (node === 'reject-out') {
 				effective_outbound = 'block-out';
+			} else if (length(node) > 6 && substr(node, 0, 6) === 'group:') {
+				effective_outbound = group_outbounds[substr(node, 6)] || 'main-out';
 			} else if (node === 'urltest') {
 				const rule_urltest_nodes = valid_node_list(cfg.urltest_nodes || []);
 				if (length(rule_urltest_nodes)) {

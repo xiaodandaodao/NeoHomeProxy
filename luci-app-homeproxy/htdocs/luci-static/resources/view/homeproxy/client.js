@@ -187,6 +187,14 @@ return view.extend({
 					String.format('[%s]', nodeaddr) : nodeaddr) + ':' + nodeport));
 		});
 
+		let node_groups = {};
+		uci.sections(data[0], 'group', (res) => {
+			if (!res.label)
+				return;
+			node_groups[res.label] = res.label +
+				((res.enabled === '0') ? ' (' + _('disabled') + ')' : '');
+		});
+
 		function formatDelay(delay) {
 			if (delay === null || delay === undefined)
 				return '';
@@ -670,6 +678,8 @@ return view.extend({
 		so.value('reject-out', _('Reject'));
 		for (let i in proxy_nodes)
 			so.value(i, proxy_nodes[i]);
+		for (let g in node_groups)
+			so.value('group:' + g, _('Node group') + ': ' + node_groups[g]);
 		so.default = 'main-out';
 		so.rmempty = false;
 		so.editable = true;
@@ -703,6 +713,56 @@ return view.extend({
 		so.default = so.disabled;
 		so.rmempty = false;
 		so.depends('node', 'urltest');
+		so.modalonly = true;
+		so.retain = true;
+
+		s.tab('node_groups', _('Node Groups'));
+		o = s.taboption('node_groups', form.SectionValue, '_node_groups', form.GridSection, 'group');
+		o.depends('routing_mode', 'bypass_mainland_china');
+
+		ss = o.subsection;
+		ss.addremove = true;
+		ss.anonymous = true;
+		ss.sortable = true;
+		ss.nodescriptions = true;
+
+		so = ss.option(form.Flag, 'enabled', _('Enable'));
+		so.default = so.enabled;
+		so.rmempty = false;
+		so.editable = true;
+
+		so = ss.option(form.Value, 'label', _('Group name'),
+			_('Reusable node group. Routing rules can select it directly, so the same nodes are maintained in one place only.'));
+		so.rmempty = false;
+		so.retain = true;
+
+		so = ss.option(hp.CBIStaticList, 'nodes', _('Nodes'),
+			_('Nodes belonging to this group.'));
+		for (let i in proxy_nodes)
+			so.value(i, proxy_nodes[i]);
+		so.rmempty = false;
+		so.modalonly = true;
+		so.retain = true;
+
+		so = ss.option(form.Value, 'urltest_interval', _('Test interval'),
+			_('The test interval in seconds.'));
+		so.datatype = 'uinteger';
+		so.placeholder = '120';
+		so.rmempty = false;
+		so.modalonly = true;
+		so.retain = true;
+
+		so = ss.option(form.Value, 'urltest_tolerance', _('Test tolerance'),
+			_('The test tolerance in milliseconds.'));
+		so.datatype = 'uinteger';
+		so.placeholder = '40';
+		so.rmempty = false;
+		so.modalonly = true;
+		so.retain = true;
+
+		so = ss.option(form.Flag, 'urltest_interrupt_exist_connections', _('Interrupt existing connections'));
+		so.default = so.disabled;
+		so.rmempty = false;
 		so.modalonly = true;
 		so.retain = true;
 

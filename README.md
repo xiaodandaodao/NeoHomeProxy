@@ -1,57 +1,114 @@
-# luci-app-homeproxy
+# NeoHomeProxy
 
-基于 [homeproxy](https://github.com/immortalwrt/homeproxy) 修改的 OpenWrt 代理客户端，以 [sing-box](https://github.com/shtorm-7/sing-box-extended) 为核心，提供 LuCI 管理界面。
+> HomeProxy 的增强分支 —— 在 [XiaoHaiSly/luci-app-homeproxy](https://github.com/XiaoHaiSly/luci-app-homeproxy)
+> 之上加入 **可复用的节点组（Node Groups）**，并修复若干在部分设备上会导致「订阅一个都拉不到」的问题。
 
-本仓库包含两个软件包：
+包名保持 `luci-app-homeproxy`，**可直接覆盖官方/上游包**（升级链完整，版本号形如 `2026.10.20-rNNN`）。
 
-| 目录 | 说明 |
-| --- | --- |
-| `luci-app-homeproxy/` | LuCI 界面与服务脚本 |
-| `sing-box/` | sing-box-extended 核心 |
+## 为什么需要节点组
 
-## 主要增强
+上游的「分流规则」里，每条规则选择「独立 URLTest」时，节点清单是**挂在规则自己身上的**。
+于是「Google 和 AI 都要走美国节点」就得把同一批美国节点在两条规则里各存一遍，
+节点变动要改两处，规则一多就很容易漏。
 
-- **DNS Fallback**：主 DNS 与国内 DNS 均可配置多个备用服务器，支持 DNS 劫持
-- **XHTTP 支持**，新一代 Xray 传输方式
-- **sing-box 面板**：内置 Dashboard sing-box官方面板
-- **TUN 模式**：统一使用 TUN 入站并启用 `auto_redirect`，TCP/UDP 均由 sing-box 处理
-- **分流规则**：按服务单独指定出口。内置 YouTube、TikTok、Telegram、Twitter/X、Google、Cloudflare、GitHub、AI 服务（非大陆）等预设，也可自定义规则；每条规则可单独选择走主节点、独立 URLTest、指定节点、直连或拒绝，并同步为该规则的域名选用对应的 DNS。支持拖动排序和单条启停，规则按顺序匹配。
-- **在线更新核心**：可在界面中更新 sing-box 核心
-- 缓存与配置加载流程优化，提高运行稳定性
+节点组把这件事拆成两层：
 
-## TUN 模式
+- **组（group）**：一个命名节点集合（`美国组`、`日本组`…），成员节点只维护一份
+- **规则**：分流规则的出口直接选组，多条规则可共用同一个组
 
-在 Linux 上，sing-box 官方推荐的透明代理方式就是 TUN 配合 `auto_redirect`。本项目统一采用这一方案，用户不必再在多个模式之间选择：
+最终生成的是一个**共享的 urltest 出站**（`group-<组名>-out`），所有引用该组的规则指向同一个 outbound。
 
-- **TCP + UDP 全支持**：redirect 模式只能处理 TCP；TUN 一个模式即可同时覆盖 TCP 和 UDP。
-- **性能更好**：sing-box 官方文档指出，`auto_redirect` 提供更好的路由和更高的性能（优于 tproxy），并能避免 TUN 与 Docker 桥接网络之间的冲突。
-- **国内直连**：绕过大陆模式下，sing-box 启动时会根据 `geoip-cn` 规则集生成 nftables 规则（规则集更新时自动刷新），目的地为国内 IP 的连接直接放行，不再交给 sing-box 处理，节省 CPU。
+## 新增功能：节点组
 
-## 运行要求
+### 界面用法
 
-- OpenWrt / ImmortalWrt（需使用 firewall4）
-- **sing-box-extended ≥ 1.14.0**（官方版本缺少部分功能，请使用本仓库 `sing-box/` 编译的版本，或自行引用本仓库进行编译）
+1. 服务 → **NeoHomeProxy** → 客户端设置 → **Node Groups**（节点组）页签 → 添加
+   - 填组名（如 `美国组`）
+   - 勾选属于该组的节点
+   - 可调测速间隔 / 容差
+   - 保存应用
+2. 同一页面 **Routing Rules**（分流规则）页签 → 编辑目标规则的「节点」下拉 →
+   选 `Node group: 美国组` → 保存应用
+3. 浏览器若没出现新页签，**强制刷新（Ctrl+F5）**。
 
-### 从源码编译
-
-将本仓库放入 OpenWrt 源码或 SDK 的 `package/` 目录（或添加为 feed），然后：
+### 命令行用法
 
 ```sh
-make menuconfig
-make package/luci-app-homeproxy/compile V=s
-make package/sing-box/compile V=s
+G=$(uci add homeproxy group)
+uci set homeproxy.$G.enabled='1'
+uci set homeproxy.$G.label='美国组'
+uci set homeproxy.$G.urltest_interval='120'
+uci set homeproxy.$G.urltest_tolerance='40'
+uci add_list homeproxy.$G.nodes='<节点 section id>'
+# 规则指向该组
+uci set homeproxy.@app_rule[1].node='group:美国组'
+uci commit homeproxy
+/etc/init.d/homeproxy restart
 ```
 
-`sing-box` 的 Makefile 提供精简构建选项（`SING_BOX_TINY_BUILD_*`），可在 menuconfig 中按需裁剪功能以减小体积。
+### 行为约定
+
+- 每个组生成**一个** urltest 出站 `group-<组名>-out`；同一组的规则共享它。
+- 组内成员失效（如订阅更新后节点 id 变化）会被自动剔除；组被清空时，引用它的规则回退到主节点。
+- **改名必须同步改引用它的规则**，否则该规则会回退到主节点。
+
+## 相对上游的改动
+
+| 文件 | 改动 | 原因 |
+| --- | --- | --- |
+| `root/etc/homeproxy/scripts/generate_client.uc` | 新增 UCI 段类型 `group`：每个组生成共享 urltest 出站 `group-<组名>-out`；分流规则的出口支持 `group:<组名>` | 节点组核心 |
+| `root/etc/homeproxy/scripts/homeproxy.uc` | `curlGET()` 去掉 `--compressed` | 见下 |
+| `htdocs/luci-static/resources/homeproxy.js` | `reconcileUrltestNodes()` 增补 `group:` 白名单与组内失效节点清理 | 原逻辑会把不在节点表里的出口值打回 `main-out`，`group:` 会被误清 |
+| `htdocs/luci-static/resources/view/homeproxy/client.js` | 新增 **Node Groups** 页签；分流规则的「节点」下拉追加 `Node group: <组名>` | 节点组界面 |
+| `root/usr/share/luci/menu.d/luci-app-homeproxy.json` | 菜单标题改为 NeoHomeProxy | 品牌标识 |
+| `po/zh_Hans/homeproxy.po`、`po/templates/homeproxy.pot` | 补 5 条新界面字符串的中文翻译 | i18n |
+
+### `--compressed` 修复（重要）
+
+`curlGET()` 原本固定拼接 `--compressed`：
+
+```
+/usr/bin/curl -fsSL --compressed --retry 3 --retry-all-errors ...
+```
+
+而 **OpenWrt 自带的 curl 7.83.1 编译时未带 zlib**，遇到不认识的选项会**直接 exit 2**：
+
+```
+curl: option --compressed: the installed libcurl version doesn't support this
+```
+
+`curlGET()` 在 exitcode ≠ 0 时返回 null，于是**所有订阅一个都进不来**
+（与订阅格式、User-Agent、是否走代理都无关；换浏览器 UA 一样失败）。
+本项目已移除该选项，兼容所有设备。
+
+## 安装
+
+从 [Releases](https://github.com/xiaodandaodao/NeoHomeProxy/releases) 下载 `luci-app-homeproxy_*_all.ipk`：
+
+```sh
+opkg install --force-reinstall luci-app-homeproxy_*.ipk
+```
+
+或走 Actions：推送到 `main` 触发 `Build luci-app-homeproxy`，产物在 Artifacts 里。
+
+> 安装后如界面无变化，执行 `rm -f /tmp/luci-indexcache* && rm -rf /tmp/luci-modulecache/ && killall -HUP rpcd`，
+> 浏览器再强制刷新。
 
 ## 与上游的差异
 
-- 移除了 redirect / tproxy 等旧代理模式，统一使用 TUN（原因见上文）。升级时迁移脚本会自动清理旧版本遗留的选项，并将代理模式设为 TUN。
-- 核心要求提升到 sing-box-extended ≥ 1.14.0。
+除上表所列外，功能与 [XiaoHaiSly/luci-app-homeproxy](https://github.com/XiaoHaiSly/luci-app-homeproxy) 一致：
+DNS Fallback、XHTTP 支持、sing-box 面板、TUN 模式、应用分流预设（YouTube / TikTok / Telegram /
+Twitter / Google / Cloudflare / GitHub / AI 服务）、在线更新核心等。
+
+上游自带的增强（相对 immortalwrt/homeproxy）：
+
+- 移除了 redirect / tproxy 等旧代理模式，统一使用 TUN（`auto_redirect`）
+- 核心要求提升到 sing-box-extended ≥ 1.14.0
 
 ## 许可证与致谢
 
 本项目以 GPL-2.0 协议发布，详见 [LICENSE](LICENSE)。
 
-- [immortalwrt/homeproxy](https://github.com/immortalwrt/homeproxy)：本项目的上游
+- [XiaoHaiSly/luci-app-homeproxy](https://github.com/XiaoHaiSly/luci-app-homeproxy)：本项目的直接上游
+- [immortalwrt/homeproxy](https://github.com/immortalwrt/homeproxy)：HomeProxy 原始上游
 - [shtorm-7/sing-box](https://github.com/shtorm-7/sing-box-extended)：代理核心

@@ -3021,3 +3021,30 @@ msgstr "有效端口值"
 msgid "valid uuid"
 msgstr "有效 uuid"
 
+#: htdocs/luci-static/resources/view/homeproxy/client.js:719
+
+msgid "Node Groups"
+
+msgstr "节点组"
+
+#: htdocs/luci-static/resources/view/homeproxy/client.js:734
+
+msgid "Group name"
+
+msgstr "组名"
+
+#: htdocs/luci-static/resources/view/homeproxy/client.js:740
+
+msgid "Nodes belonging to this group."
+
+msgstr "属于该组的节点。"
+
+#: htdocs/luci-static/resources/view/homeproxy/client.js:735
+
+msgid "Reusable node group. Routing rules can select it directly, so the same nodes are maintained in one place only."
+
+msgstr "可复用的节点组。分流规则可直接选择它，同一批节点只需在一处维护。"
+
+msgid "Node group: %s"
+
+msgstr "节点组：%s"
