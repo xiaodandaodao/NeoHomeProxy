@@ -46,6 +46,7 @@ jobs:
             pkg_format: apk
             arch_suffix: arm64
             go_arch: arm64
+            core_tarball: 'false'
             sdk_base: snapshots
             sdk_path: qualcommax/ipq60xx
             sdk_prefix: immortalwrt-sdk-qualcommax-ipq60xx_
@@ -56,6 +57,7 @@ jobs:
             pkg_format: apk
             arch_suffix: x86_64
             go_arch: amd64
+            core_tarball: 'false'
             sdk_base: snapshots
             sdk_path: x86/64
             sdk_prefix: immortalwrt-sdk-x86-64_
@@ -66,6 +68,7 @@ jobs:
             pkg_format: ipk
             arch_suffix: arm64
             go_arch: arm64
+            core_tarball: 'true'
             sdk_base: releases/24.10.6
             sdk_path: qualcommax/ipq807x
             sdk_prefix: immortalwrt-sdk-24.10.6-qualcommax-ipq807x_gcc-13.3.0_
@@ -76,6 +79,7 @@ jobs:
             pkg_format: ipk
             arch_suffix: x86_64
             go_arch: amd64
+            core_tarball: 'true'
             sdk_base: releases/24.10.6
             sdk_path: x86/64
             sdk_prefix: immortalwrt-sdk-24.10.6-x86-64_gcc-13.3.0_
@@ -247,6 +251,7 @@ jobs:
           sha256sum -- * > SHA256SUMS
 
       - name: Prepare core tarball for the in-app updater
+        if: matrix.core_tarball == 'true'
         env:
           ARCH_SUFFIX: ${{ matrix.arch_suffix }}
           GO_ARCH: ${{ matrix.go_arch }}
